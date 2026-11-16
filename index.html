@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Flood Detection Dashboard</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+body{font-family:Arial,sans-serif;background:#eef4f8;text-align:center;margin:0;padding:25px;color:#17324d}
+.container{max-width:650px;margin:auto}h1{color:#075985}
+.card{background:white;padding:22px;margin:18px 0;border-radius:12px;box-shadow:0 3px 12px #00000015}
+.value{font-size:42px;font-weight:bold}#status{font-size:25px;font-weight:bold}
+.bar{height:22px;background:#dbe5ed;border-radius:20px;overflow:hidden}
+#progress{height:100%;width:0%;background:#16a34a;transition:width .3s}
+.normal{color:#16a34a}.high{color:#ca8a04}.alert{color:#dc2626}
+#connection{font-weight:bold}#log{text-align:left;max-height:150px;overflow-y:auto;font-size:13px}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Smart Flood Detection System</h1><p>IoT Monitoring with Fog Computing</p>
+<div class="card">MQTT Connection: <span id="connection">Connecting...</span></div>
+<div class="card"><h2>Water Level</h2><div class="value" id="level">--%</div><div class="bar"><div id="progress"></div></div></div>
+<div class="card"><h2>Flood Status</h2><div id="status">Waiting for data...</div></div>
+<div class="card"><h2>System Output</h2>
+<p>LED: <strong id="led">--</strong></p><p>Buzzer: <strong id="buzzer">--</strong></p>
+<p>Raw Sensor Value: <strong id="raw">--</strong></p><p>Last Updated: <strong id="time">--</strong></p></div>
+<div class="card"><h2>Activity Log</h2><div id="log">Waiting for sensor readings...</div></div>
+</div>
+<script>
+const BROKER="wss://broker.hivemq.com:8884/mqtt";
+const TOPIC="sachin-flood-demo-01/processed";
+const client=mqtt.connect(BROKER);
+const connection=document.getElementById("connection");
+const levelElement=document.getElementById("level");
+const progress=document.getElementById("progress");
+const statusElement=document.getElementById("status");
+
+client.on("connect",()=>{connection.textContent="Connected";connection.style.color="green";client.subscribe(TOPIC);});
+client.on("reconnect",()=>{connection.textContent="Reconnecting...";});
+client.on("error",error=>{connection.textContent="Connection error";console.error(error);});
+client.on("offline",()=>{connection.textContent="Offline";connection.style.color="red";});
+
+client.on("message",(topic,message)=>{
+  try{
+    const data=JSON.parse(message.toString());
+    const level=Number(data.level);
+    if(!Number.isFinite(level)) return;
+    levelElement.textContent=level+"%";
+    progress.style.width=level+"%";
+    statusElement.textContent=data.status;
+    statusElement.className="";
+    if(data.status==="NORMAL"){statusElement.classList.add("normal");progress.style.background="#16a34a";}
+    else if(data.status==="HIGH"){statusElement.classList.add("high");progress.style.background="#ca8a04";}
+    else{statusElement.classList.add("alert");progress.style.background="#dc2626";}
+    document.getElementById("led").textContent=data.led;
+    document.getElementById("buzzer").textContent=data.buzzer;
+    document.getElementById("raw").textContent=data.raw;
+    document.getElementById("time").textContent=new Date().toLocaleTimeString();
+    const entry=document.createElement("p");
+    entry.textContent=new Date().toLocaleTimeString()+" - "+level+"% - "+data.status;
+    document.getElementById("log").prepend(entry);
+  }catch(error){console.error("Invalid message:",error);}
+});
+</script>
+</body>
+</html>
